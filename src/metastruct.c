@@ -57,17 +57,17 @@ int metastruct_fmt_internal_fprint(const metastruct_meta_t * meta, void *ptr, co
 		}
 
 		const char * colon = memchr(format + tok.begin, ':', tok.end - tok.begin);
-		int var_begin = tok.begin + 1;
-		int var_end = colon ? colon - format: tok.end - 1;
+		const int var_begin = tok.begin + 1;
+		const int var_end = colon ? colon - format: tok.end - 1;
 
-		unsigned i, found;
+		const metastruct_meta_t * match = NULL;
 
-		// Naive search in meta data of struct for token variable
-		for (i = 0, found = false; meta[i].name && !found; i += !found)
-			// found is set true when lengths of metadata name and token variable match and when contents of metadata name and token variable match
-			found = meta[i].namelen == var_end - var_begin && memcmp(format + var_begin, meta[i].name, meta[i].namelen) == 0;
+		// do linear search: a match is found when length and name of the variable in meta data are the same as of the token variable
+		for (unsigned i = 0; meta[i].name && !match; ++i)
+			if (meta[i].namelen == var_end - var_begin && memcmp(format + var_begin, meta[i].name, meta[i].namelen) == 0)
+				match = meta + i;
 
-		if (!found) {
+		if (!match) {
 			fputs("{ metastruct member not found: ", out);
 			fwrite(format + var_begin, sizeof(char), var_end - var_begin, out);
 			fputs(" }", out);
@@ -86,7 +86,7 @@ int metastruct_fmt_internal_fprint(const metastruct_meta_t * meta, void *ptr, co
 		} rslt;
 
 		rslt.target = ptr;
-		rslt.offs += meta[i].offs;
+		rslt.offs += match->offs;
 
 		char format_buf[12] = {'%', '\0'};
 
@@ -94,7 +94,7 @@ int metastruct_fmt_internal_fprint(const metastruct_meta_t * meta, void *ptr, co
 			assert(tok.end - var_end - 2 < 10 && "Formatbuffer too small");
 			strncat(format_buf, format + var_end + 1, tok.end - var_end - 2);
 		}
-		else switch(meta[i].type_hint) {
+		else switch(match->type_hint) {
 			case 'd':
 				strcat(format_buf, "lf");
 				break;
@@ -113,7 +113,7 @@ int metastruct_fmt_internal_fprint(const metastruct_meta_t * meta, void *ptr, co
 				break;
 		}
 
-		switch(meta[i].type_hint) {
+		switch(match->type_hint) {
 			case 'd':
 				fprintf(out, format_buf, *rslt.dnum);
 				break;
